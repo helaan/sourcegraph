@@ -65,7 +65,7 @@ RUN set -ex && \
  apk add --no-cache libc6-compat=1.1.23-r3 ca-certificates su-exec
 
 # hadolint ignore=DL3022
-COPY --from=grafana/grafana:6.1.1@sha256:e7a513bf7f33ef9681b2d35a799136e1ce9330f9055f75dfa2101d812946184b /usr/share/grafana /usr/share/grafana
+COPY --from=grafana/grafana:6.3.5@sha256:b8875047c89d980b90d478ab0e9726e37c3db97a50eec2399b13dcd1686b2c98 /usr/share/grafana /usr/share/grafana
 
 # hadolint ignore=DL3022
 COPY --from=libsqlite3-pcre /sqlite3-pcre/pcre.so /libsqlite3-pcre.so
