@@ -21,11 +21,13 @@ import { CampaignForceRefreshButton } from '../common/CampaignForceRefreshButton
 import { NamespaceCampaignsAreaContext } from '../namespace/NamespaceCampaignsArea'
 import { CampaignActivity } from './activity/CampaignActivity'
 import { CampaignOverview } from './CampaignOverview'
+import { CampaignDiagnostics } from './diagnostics/CampaignDiagnostics'
 import { CampaignFileDiffsList } from './fileDiffs/CampaignFileDiffsList'
 import { CampaignParticipantListPage } from './participants/CampaignParticipantListPage'
 import { CampaignRepositoriesList } from './repositories/CampaignRepositoriesList'
 import { CampaignThreadListPage } from './threads/CampaignThreadListPage'
 import { useCampaignByID } from './useCampaignByID'
+import { DiagnosticsIcon } from '../../../diagnostics/icons'
 import { isDefined } from '../../../../../shared/src/util/types'
 import SettingsIcon from 'mdi-react/SettingsIcon'
 import { CampaignManagePage } from './manage/CampaignManagePage'
@@ -167,6 +169,7 @@ export const CampaignArea: React.FunctionComponent<Props> = ({
                         {
                             title: 'Activity',
                             icon: ForumIcon,
+                            count: campaign.comments.totalCount - 1,
                             path: '',
                             exact: true,
                             render: () => (
@@ -176,6 +179,20 @@ export const CampaignArea: React.FunctionComponent<Props> = ({
                                 </>
                             ),
                         },
+                        {
+                            title: 'Diagnostics',
+                            icon: DiagnosticsIcon,
+                            count: campaign.diagnostics.totalCount,
+                            path: '/diagnostics',
+                            render: () => (
+                                <>
+                                    <PageTitle title={`Diagnostics - ${campaign.name}`} />
+                                    <CampaignDiagnostics {...context} className={PAGE_CLASS_NAME} />
+                                </>
+                            ),
+                            condition: () => campaign.diagnostics.totalCount > 0,
+                        },
+
                         {
                             title: 'Changes',
                             icon: DiffIcon,
@@ -219,6 +236,19 @@ export const CampaignArea: React.FunctionComponent<Props> = ({
                                     <CampaignParticipantListPage {...context} className={PAGE_CLASS_NAME} />
                                 </>
                             ),
+                        },
+                        {
+                            title: 'Manage',
+                            icon: SettingsIcon,
+                            path: '/manage',
+                            render: ({ match }) => (
+                                <>
+                                    <PageTitle title={`Manage - ${campaign.name}`} />
+                                    <CampaignManagePage {...context} match={match} className="container" />
+                                </>
+                            ),
+                            hideInNavbar: true,
+                            fullPage: true,
                         },
                     ]}
                     location={props.location}

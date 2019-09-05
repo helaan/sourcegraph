@@ -65,13 +65,17 @@ CREATE TABLE comments (
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
 
+	parent_comment_id bigint REFERENCES comments(id) ON DELETE CASCADE,
+    thread_id bigint REFERENCES threads(id) ON DELETE CASCADE,
     campaign_id bigint REFERENCES campaigns(id) ON DELETE CASCADE
 );
+CREATE UNIQUE INDEX comments_thread_id ON comments(thread_id);
 CREATE UNIQUE INDEX comments_campaign_id ON comments(campaign_id);
 CREATE INDEX comments_author_user_id ON comments(author_user_id);
 
--- Ensure every campaign has a primary comment (the "top comment" whose body is the description of
--- the object).
+-- Ensure every thread and campaign has a primary comment (the "top comment" whose body is the
+-- description the object).
+ALTER TABLE threads ADD COLUMN primary_comment_id bigint NOT NULL REFERENCES comments(id) ON DELETE RESTRICT;
 ALTER TABLE campaigns ADD COLUMN primary_comment_id bigint NOT NULL REFERENCES comments(id) ON DELETE RESTRICT;
 
 -----------------

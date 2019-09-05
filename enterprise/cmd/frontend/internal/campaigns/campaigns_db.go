@@ -22,6 +22,11 @@ type dbCampaign struct {
 	NamespaceUserID int32  // the user namespace where this campaign is defined
 	NamespaceOrgID  int32  // the org namespace where this campaign is defined
 	Name            string // the name (case-preserving)
+	TemplateID      *string
+	TemplateContext *string
+	IsDraft         bool
+	StartDate       *time.Time
+	DueDate         *time.Time
 
 	PrimaryCommentID int64
 	CreatedAt        time.Time
@@ -34,7 +39,7 @@ var errCampaignNotFound = errors.New("campaign not found")
 
 type dbCampaigns struct{}
 
-const selectColumns = `id, namespace_user_id, namespace_org_id, name, primary_comment_id, created_at, updated_at`
+const selectColumns = `id, namespace_user_id, namespace_org_id, name, template_id, template_context, is_draft, start_date, due_date, primary_comment_id, created_at, updated_at`
 
 // Create creates a campaign. The campaign argument's (Campaign).ID field is ignored. The new
 // campaign is returned.
@@ -52,6 +57,11 @@ func (dbCampaigns) Create(ctx context.Context, campaign *dbCampaign, comment com
 			nnz.Int32(campaign.NamespaceUserID),
 			nnz.Int32(campaign.NamespaceOrgID),
 			campaign.Name,
+			campaign.TemplateID,
+			campaign.TemplateContext,
+			campaign.IsDraft,
+			campaign.StartDate,
+			campaign.DueDate,
 			commentID,
 		}
 		query := sqlf.Sprintf(
@@ -68,7 +78,15 @@ func (dbCampaigns) Create(ctx context.Context, campaign *dbCampaign, comment com
 }
 
 type dbCampaignUpdate struct {
-	Name *string
+	Name            *string
+	TemplateID      *string
+	TemplateContext *string
+	ClearTemplate   bool // set template_id and template_context to null
+	IsDraft         *bool
+	StartDate       *time.Time
+	ClearStartDate  bool
+	DueDate         *time.Time
+	ClearDueDate    bool
 }
 
 // Update updates a campaign given its ID.
@@ -81,6 +99,28 @@ func (s dbCampaigns) Update(ctx context.Context, id int64, update dbCampaignUpda
 	if update.Name != nil {
 		setFields = append(setFields, sqlf.Sprintf("name=%s", *update.Name))
 	}
+	if update.ClearTemplate {
+		setFields = append(setFields, sqlf.Sprintf("template_id=null"), sqlf.Sprintf("template_context=null"))
+	} else {
+		if update.TemplateID != nil {
+			setFields = append(setFields, sqlf.Sprintf("template_id=%s", *update.TemplateID))
+		}
+		if update.TemplateContext != nil {
+			setFields = append(setFields, sqlf.Sprintf("template_context=%s", update.TemplateContext))
+		}
+	}
+	if update.IsDraft != nil {
+		setFields = append(setFields, sqlf.Sprintf("is_draft=%v", *update.IsDraft))
+	}
+	clearOrUpdate := func(column string, clear, update bool, updateValue interface{}) {
+		if clear {
+			setFields = append(setFields, sqlf.Sprintf("start_date=null"))
+		} else if update {
+			setFields = append(setFields, sqlf.Sprintf("start_date=%v", updateValue))
+		}
+	}
+	clearOrUpdate("start_date", update.ClearStartDate, update.StartDate != nil, update.StartDate)
+	clearOrUpdate("due_date", update.ClearDueDate, update.DueDate != nil, update.DueDate)
 
 	if len(setFields) == 0 {
 		return nil, nil
@@ -192,6 +232,11 @@ func (dbCampaigns) scanRow(row interface {
 		nnz.ToInt32(&t.NamespaceUserID),
 		nnz.ToInt32(&t.NamespaceOrgID),
 		&t.Name,
+		&t.TemplateID,
+		&t.TemplateContext,
+		&t.IsDraft,
+		&t.StartDate,
+		&t.DueDate,
 		&t.PrimaryCommentID,
 		&t.CreatedAt,
 		&t.UpdatedAt,

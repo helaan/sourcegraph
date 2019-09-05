@@ -84,6 +84,11 @@ func (r *NodeResolver) ToCampaign() (Campaign, bool) {
 	return n, ok
 }
 
+func (r *NodeResolver) ToCommentReply() (CommentReply, bool) {
+	n, ok := r.Node.(CommentReply)
+	return n, ok
+}
+
 func (r *NodeResolver) ToCommitStatusContext() (CommitStatusContext, bool) {
 	n, ok := r.Node.(CommitStatusContext)
 	return n, ok
@@ -119,6 +124,11 @@ func (r *NodeResolver) ToExternalService() (*externalServiceResolver, bool) {
 	return n, ok
 }
 
+func (r *NodeResolver) ToLabel() (Label, bool) {
+	n, ok := r.Node.(Label)
+	return n, ok
+}
+
 func (r *NodeResolver) ToGitRef() (*GitRefResolver, bool) {
 	n, ok := r.Node.(*GitRefResolver)
 	return n, ok
@@ -126,6 +136,11 @@ func (r *NodeResolver) ToGitRef() (*GitRefResolver, bool) {
 
 func (r *NodeResolver) ToRepository() (*RepositoryResolver, bool) {
 	n, ok := r.Node.(*RepositoryResolver)
+	return n, ok
+}
+
+func (r *NodeResolver) ToRule() (Rule, bool) {
+	n, ok := r.Node.(Rule)
 	return n, ok
 }
 
@@ -209,6 +224,8 @@ func NodeByID(ctx context.Context, id graphql.ID) (Node, error) {
 		return accessTokenByID(ctx, id)
 	case GQLTypeCampaign:
 		return CampaignByID(ctx, id)
+	case "CommentReply":
+		return CommentReplyByID(ctx, id)
 	case GQLTypeCommitStatusContext:
 		return CommitStatusContextByID(ctx, id)
 	case "DiscussionComment":
@@ -229,10 +246,14 @@ func NodeByID(ctx context.Context, id graphql.ID) (Node, error) {
 		return externalAccountByID(ctx, id)
 	case externalServiceIDKind:
 		return externalServiceByID(ctx, id)
+	case GQLTypeLabel:
+		return LabelByID(ctx, id)
 	case "GitRef":
 		return gitRefByID(ctx, id)
 	case "Repository":
 		return repositoryByID(ctx, id)
+	case GQLTypeRule:
+		return RuleByID(ctx, id)
 	case "User":
 		return UserByID(ctx, id)
 	case "Org":

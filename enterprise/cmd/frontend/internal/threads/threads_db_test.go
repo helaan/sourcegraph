@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sourcegraph/sourcegraph/cmd/frontend/actor"
 	"github.com/sourcegraph/sourcegraph/cmd/frontend/db"
+	commentobjectdb "github.com/sourcegraph/sourcegraph/enterprise/cmd/frontend/internal/comments/commentobjectdb"
 	"github.com/sourcegraph/sourcegraph/pkg/api"
 	"github.com/sourcegraph/sourcegraph/pkg/db/dbtesting"
 )
@@ -21,11 +23,16 @@ func TestDB_Threads(t *testing.T) {
 	norm := func(vs ...*DBThread) {
 		for _, v := range vs {
 			v.ID = 0
+			v.PrimaryCommentID = 0
 			v.CreatedAt = time.Time{}
 			v.UpdatedAt = time.Time{}
 		}
 	}
 
+	user, err := db.Users.Create(ctx, db.NewUser{Username: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Repos.Upsert(ctx, api.InsertRepoOp{Name: "r", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +42,7 @@ func TestDB_Threads(t *testing.T) {
 	}
 
 	wantThread0 := &DBThread{RepositoryID: repo0.ID, Title: "t0"}
-	thread0, err := dbThreads{}.Create(ctx, nil, wantThread0)
+	thread0, err := dbThreads{}.Create(ctx, nil, wantThread0, commentobjectdb.DBObjectCommentFields{Author: actor.DBColumns{UserID: user.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +50,7 @@ func TestDB_Threads(t *testing.T) {
 	thread1, err := dbThreads{}.Create(ctx, nil, &DBThread{
 		RepositoryID: repo0.ID,
 		Title:        "t1",
-	})
+	}, commentobjectdb.DBObjectCommentFields{Author: actor.DBColumns{UserID: user.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}

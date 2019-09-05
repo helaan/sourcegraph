@@ -3,13 +3,17 @@ package threads
 import (
 	"context"
 	"encoding/json"
+	"path"
 	"strconv"
 
 	"github.com/graph-gophers/graphql-go"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/sourcegraph/cmd/frontend/events"
 	"github.com/sourcegraph/sourcegraph/cmd/frontend/graphqlbackend"
 	"github.com/sourcegraph/sourcegraph/cmd/frontend/graphqlbackend/externallink"
 	"github.com/sourcegraph/sourcegraph/cmd/frontend/graphqlbackend/graphqlutil"
+	"github.com/sourcegraph/sourcegraph/enterprise/cmd/frontend/internal/comments"
+	commentobjectdb "github.com/sourcegraph/sourcegraph/enterprise/cmd/frontend/internal/comments/commentobjectdb"
 	"github.com/sourcegraph/sourcegraph/pkg/api"
 )
 
@@ -18,10 +22,14 @@ import (
 // gqlThread implements the GraphQL type Thread.
 type gqlThread struct {
 	db *DBThread
+	graphqlbackend.PartialComment
 }
 
 func newGQLThread(db *DBThread) *gqlThread {
-	return &gqlThread{db: db}
+	return &gqlThread{
+		db:             db,
+		PartialComment: comments.GraphQLResolver{}.LazyCommentByID(graphqlbackend.MarshalThreadID(db.ID)),
+	}
 }
 
 // threadByID looks up and returns the Thread with the given GraphQL ID. If no such Thread exists, it
@@ -88,9 +96,13 @@ func (v *gqlThread) Repository(ctx context.Context) (*graphqlbackend.RepositoryR
 
 func (v *gqlThread) Internal_RepositoryID() api.RepoID { return v.db.RepositoryID }
 
+func (v *gqlThread) Number() string { return strconv.FormatInt(v.db.ID, 10) }
+
 func (v *gqlThread) DBID() int64 { return v.db.ID }
 
 func (v *gqlThread) Title() string { return v.db.Title }
+
+func (v *gqlThread) IsDraft() bool { return v.db.IsDraft }
 
 func (v *gqlThread) State() graphqlbackend.ThreadState {
 	return graphqlbackend.ThreadState(v.db.State)
@@ -110,23 +122,61 @@ func (v *gqlThread) HeadRef() *string {
 	return &v.db.HeadRef
 }
 
+func (v *gqlThread) Diagnostics(ctx context.Context, arg *graphqlbackend.ThreadDiagnosticConnectionArgs) (graphqlbackend.ThreadDiagnosticConnection, error) {
+	threadID := v.ID()
+	arg.Thread = &threadID
+	return graphqlbackend.ThreadDiagnostics.ThreadDiagnostics(ctx, arg)
+}
+
 func (v *gqlThread) Kind(ctx context.Context) (graphqlbackend.ThreadKind, error) {
 	if v.db.BaseRef != "" || v.db.HeadRef != "" {
 		return graphqlbackend.ThreadKindChangeset, nil
 	}
-	return graphqlbackend.ThreadKindIssue, nil
-}
 
-func (v *gqlThread) CreatedAt() graphqlbackend.DateTime {
-	return graphqlbackend.DateTime{Time: v.db.CreatedAt}
-}
+	if v.db.ImportedFromExternalServiceID != 0 {
+		return graphqlbackend.ThreadKindIssue, nil
+	}
 
-func (v *gqlThread) UpdatedAt() graphqlbackend.DateTime {
-	return graphqlbackend.DateTime{Time: v.db.UpdatedAt}
+	diagnosticConnection, err := v.Diagnostics(ctx, &graphqlbackend.ThreadDiagnosticConnectionArgs{})
+	if err != nil {
+		return "", err
+	}
+	count, err := diagnosticConnection.TotalCount(ctx)
+	if err != nil {
+		return "", err
+	}
+	if count > 0 {
+		return graphqlbackend.ThreadKindIssue, nil
+	}
+	return graphqlbackend.ThreadKindDiscussion, nil
 }
 
 func (v *gqlThread) ViewerCanUpdate(ctx context.Context) (bool, error) {
-	return false, nil
+	return commentobjectdb.ViewerCanUpdate(ctx, v.ID())
+}
+
+func (v *gqlThread) ViewerCanComment(ctx context.Context) (bool, error) {
+	return commentobjectdb.ViewerCanComment(ctx)
+}
+
+func (v *gqlThread) ViewerCannotCommentReasons(ctx context.Context) ([]graphqlbackend.CannotCommentReason, error) {
+	return commentobjectdb.ViewerCannotCommentReasons(ctx)
+}
+
+func (v *gqlThread) Comments(ctx context.Context, arg *graphqlutil.ConnectionArgs) (graphqlbackend.CommentConnection, error) {
+	return graphqlbackend.CommentsForObject(ctx, v.ID(), arg)
+}
+
+func (v *gqlThread) Rules(ctx context.Context, arg *graphqlutil.ConnectionArgs) (graphqlbackend.RuleConnection, error) {
+	return graphqlbackend.RulesInRuleContainer(ctx, v.ID(), arg)
+}
+
+func (v *gqlThread) URL(ctx context.Context) (string, error) {
+	repository, err := v.Repository(ctx)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(repository.URL(), "-", "threads", v.Number()), nil
 }
 
 func (v *gqlThread) ExternalURLs(ctx context.Context) ([]*externallink.Resolver, error) {
@@ -158,9 +208,15 @@ func (v *gqlThread) Campaigns(ctx context.Context, arg *graphqlutil.ConnectionAr
 	return graphqlbackend.CampaignsWithObject(ctx, v.ID(), arg)
 }
 
+func (v *gqlThread) TimelineItems(ctx context.Context, arg *graphqlbackend.EventConnectionCommonArgs) (graphqlbackend.EventConnection, error) {
+	return events.GetEventConnection(ctx,
+		arg,
+		events.Objects{Thread: v.db.ID},
+	)
+}
+
 func (v *gqlThread) Labels(ctx context.Context, arg *graphqlutil.ConnectionArgs) (graphqlbackend.LabelConnection, error) {
-	// TODO!(sqs): serialize labels from external service and use ConstLabelConnection here
-	return graphqlbackend.ConstLabelConnection(nil), nil
+	return graphqlbackend.LabelsForLabelable(ctx, v.ID(), arg)
 }
 
 func (v *gqlThread) Assignees(ctx context.Context, arg *graphqlutil.ConnectionArgs) (graphqlbackend.ActorConnection, error) {

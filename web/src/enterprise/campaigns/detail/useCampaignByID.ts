@@ -5,6 +5,17 @@ import * as GQL from '../../../../../shared/src/graphql/schema'
 import { asError, ErrorLike, isErrorLike } from '../../../../../shared/src/util/errors'
 import { ActorFragment, ActorQuery } from '../../../actor/graphql'
 import { queryGraphQL } from '../../../backend/graphql'
+import { RuleFragment } from '../../rules/useRules'
+
+export const CampaignTemplateInstanceFragment = gql`
+    fragment CampaignTemplateInstanceFragment on CampaignTemplateInstance {
+        template
+        context {
+            raw
+            parsed
+        }
+    }
+`
 
 const LOADING: 'loading' = 'loading'
 
@@ -36,10 +47,22 @@ export const useCampaignByID = (campaign: GQL.ID): [Result, (update?: Partial<GQ
                             author {
                                 ${ActorQuery}
                             }
+                            template {
+                                ...CampaignTemplateInstanceFragment
+                            }
+                            isDraft
+                            startDate
+                            dueDate
                             createdAt
                             updatedAt
                             viewerCanUpdate
                             url
+                            comments {
+                                totalCount
+                            }
+                            diagnostics {
+                                totalCount
+                            }
                             participants {
                                 totalCount
                             }
@@ -51,10 +74,18 @@ export const useCampaignByID = (campaign: GQL.ID): [Result, (update?: Partial<GQ
                             threads {
                                 totalCount
                             }
+                            rules {
+                                nodes {
+                                    ...RuleFragment
+                                }
+                                totalCount
+                            }
                         }
                     }
                 }
                 ${ActorFragment}
+                ${RuleFragment}
+                ${CampaignTemplateInstanceFragment}
             `,
             { campaign }
         )

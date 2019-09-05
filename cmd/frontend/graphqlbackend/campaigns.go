@@ -73,6 +73,20 @@ func (schemaResolver) Campaigns(ctx context.Context, arg *CampaignsArgs) (Campai
 	return Campaigns.Campaigns(ctx, arg)
 }
 
+func (r schemaResolver) CampaignPreview(ctx context.Context, arg *CampaignPreviewArgs) (CampaignPreview, error) {
+	if Campaigns == nil {
+		return nil, errCampaignsNotImplemented
+	}
+	return Campaigns.CampaignPreview(ctx, arg)
+}
+
+func (r schemaResolver) CampaignUpdatePreview(ctx context.Context, arg *CampaignUpdatePreviewArgs) (CampaignUpdatePreview, error) {
+	if Campaigns == nil {
+		return nil, errCampaignsNotImplemented
+	}
+	return Campaigns.CampaignUpdatePreview(ctx, arg)
+}
+
 func (r schemaResolver) CreateCampaign(ctx context.Context, arg *CreateCampaignArgs) (Campaign, error) {
 	if Campaigns == nil {
 		return nil, errCampaignsNotImplemented
@@ -85,6 +99,13 @@ func (r schemaResolver) UpdateCampaign(ctx context.Context, arg *UpdateCampaignA
 		return nil, errCampaignsNotImplemented
 	}
 	return Campaigns.UpdateCampaign(ctx, arg)
+}
+
+func (r schemaResolver) PublishDraftCampaign(ctx context.Context, arg *PublishDraftCampaignArgs) (Campaign, error) {
+	if Campaigns == nil {
+		return nil, errCampaignsNotImplemented
+	}
+	return Campaigns.PublishDraftCampaign(ctx, arg)
 }
 
 func (r schemaResolver) ForceRefreshCampaign(ctx context.Context, arg *ForceRefreshCampaignArgs) (Campaign, error) {
@@ -119,10 +140,13 @@ func (r schemaResolver) RemoveThreadsFromCampaign(ctx context.Context, arg *AddR
 type CampaignsResolver interface {
 	// Queries
 	Campaigns(context.Context, *CampaignsArgs) (CampaignConnection, error)
+	CampaignPreview(context.Context, *CampaignPreviewArgs) (CampaignPreview, error)
+	CampaignUpdatePreview(context.Context, *CampaignUpdatePreviewArgs) (CampaignUpdatePreview, error)
 
 	// Mutations
 	CreateCampaign(context.Context, *CreateCampaignArgs) (Campaign, error)
 	UpdateCampaign(context.Context, *UpdateCampaignArgs) (Campaign, error)
+	PublishDraftCampaign(context.Context, *PublishDraftCampaignArgs) (Campaign, error)
 	ForceRefreshCampaign(context.Context, *ForceRefreshCampaignArgs) (Campaign, error)
 	DeleteCampaign(context.Context, *DeleteCampaignArgs) (*EmptyResponse, error)
 	AddThreadsToCampaign(context.Context, *AddRemoveThreadsToFromCampaignArgs) (*EmptyResponse, error)
@@ -155,14 +179,25 @@ type CampaignUpdatePreviewArgs struct {
 	Input CampaignUpdatePreviewInput
 }
 
+type CampaignExtensionData struct {
+	RawDiagnostics []string
+	RawFileDiffs   []string
+}
+
 type CampaignPreviewInput struct {
 	Campaign CreateCampaignInput
 }
 
 type CreateCampaignInput struct {
-	Namespace graphql.ID
-	Name      string
-	Body      *string
+	Namespace     graphql.ID
+	Name          string
+	Body          *string
+	Template      *CampaignTemplateInput
+	Draft         *bool
+	StartDate     *DateTime
+	DueDate       *DateTime
+	Rules         *[]NewRuleInput
+	ExtensionData CampaignExtensionData
 }
 
 type CreateCampaignArgs struct {
@@ -175,9 +210,17 @@ type CampaignUpdatePreviewInput struct {
 }
 
 type UpdateCampaignInput struct {
-	ID   graphql.ID
-	Name *string
-	Body *string
+	ID             graphql.ID
+	Name           *string
+	Body           *string
+	Template       *CampaignTemplateInput
+	ClearTemplate  *bool
+	StartDate      *DateTime
+	ClearStartDate *bool
+	DueDate        *DateTime
+	ClearDueDate   *bool
+	Rules          *[]NewRuleInput
+	ExtensionData  *CampaignExtensionData
 }
 
 type UpdateCampaignArgs struct {
@@ -189,7 +232,8 @@ type PublishDraftCampaignArgs struct {
 }
 
 type ForceRefreshCampaignArgs struct {
-	Campaign graphql.ID
+	Campaign      graphql.ID
+	ExtensionData CampaignExtensionData
 }
 
 type DeleteCampaignArgs struct {
@@ -207,12 +251,19 @@ type Campaign interface {
 	ID() graphql.ID
 	Namespace(context.Context) (*NamespaceResolver, error)
 	Name() string
+	Template() *CampaignTemplateInstance
 	Updatable
+	commentable
+	IsDraft() bool
+	StartDate() *DateTime
+	DueDate() *DateTime
+	ruleContainer
 	URL(context.Context) (string, error)
 	Threads(context.Context, *ThreadConnectionArgs) (ThreadOrThreadPreviewConnection, error)
 	Repositories(context.Context) ([]*RepositoryResolver, error)
 	Commits(context.Context) ([]*GitCommitResolver, error)
 	RepositoryComparisons(context.Context) ([]RepositoryComparison, error)
+	Diagnostics(context.Context, *ThreadDiagnosticConnectionArgs) (ThreadDiagnosticConnection, error)
 	BurndownChart(context.Context) (CampaignBurndownChart, error)
 	TimelineItems(context.Context, *EventConnectionCommonArgs) (EventConnection, error)
 	hasParticipants
