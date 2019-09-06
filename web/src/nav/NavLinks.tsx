@@ -20,12 +20,13 @@ import { ThemePreferenceProps, ThemeProps } from '../theme'
 import { EventLoggerProps } from '../tracking/eventLogger'
 import { fetchAllStatusMessages, StatusMessagesNavItem } from './StatusMessagesNavItem'
 import { UserNavItem } from './UserNavItem'
+import { GlobalDebugModalButton, SHOW_DEBUG } from '../global/GlobalDebugModalButton'
 
 interface Props
     extends SettingsCascadeProps,
         KeyboardShortcutsProps,
         ExtensionsControllerProps<'executeCommand' | 'services'>,
-        PlatformContextProps<'forceUpdateTooltip'>,
+        PlatformContextProps<'forceUpdateTooltip' | 'sideloadedExtensionURL'>,
         ThemeProps,
         ThemePreferenceProps,
         EventLoggerProps,
@@ -116,6 +117,11 @@ export class NavLinks extends React.PureComponent<Props> {
                         keyboardShortcutForShow={KEYBOARD_SHORTCUT_SHOW_COMMAND_PALETTE}
                     />
                 </li>
+                {SHOW_DEBUG && (
+                    <li className="nav-item">
+                        <GlobalDebugModalButton {...this.props} className="nav-link btn btn-link" />
+                    </li>
+                )}
                 {this.props.authenticatedUser && (
                     <li className="nav-item">
                         <UserNavItem
